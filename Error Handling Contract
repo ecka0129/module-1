@@ -5,8 +5,6 @@ contract EckaSavings {
     address payable public owner;
     uint public minDeposit;
     uint public minWithdrawal;
-    uint public interestRate;
-    uint public lastDeposit;
 
     event Deposited(address indexed from, uint amount);
     event Withdrawn(address indexed to, uint amount);
@@ -16,40 +14,27 @@ contract EckaSavings {
         _;
     }
 
-    constructor(uint _minDeposit, uint _minWithdrawal, uint _interestRate) {
-        require(_minDeposit > 0, "Minimum deposit must be greater than zero");
-        require(_minWithdrawal > 0, "Minimum withdrawal must be greater than zero");
+    constructor(uint _minDeposit, uint _minWithdrawal) {
         owner = payable(msg.sender);
         minDeposit = _minDeposit;
         minWithdrawal = _minWithdrawal;
-        interestRate = _interestRate;
-        lastDeposit = block.timestamp;
     }
 
     function deposit() public payable {
-        require(msg.value >= minDeposit, "Deposit amount is too low");
-        lastDeposit = block.timestamp;
+        require(msg.value >= minDeposit, "Low deposit");
         emit Deposited(msg.sender, msg.value);
     }
 
     function withdraw() public onlyOwner {
         uint contractBalance = address(this).balance;
-        require(contractBalance >= minWithdrawal, "Insufficient balance for withdrawal");
-        uint interest = calcInterest(contractBalance);
-        uint total = contractBalance + interest;
-        owner.transfer(total);
-        emit Withdrawn(owner, total);
-    }
-
-    function calcInterest(uint principal) internal view returns (uint) {
-        uint elapsed = block.timestamp - lastDeposit;
-        return (principal * interestRate * elapsed) / (365 days * 100);
+        require(contractBalance >= minWithdrawal, "Low balance");
+        (bool success, ) = owner.call{value: contractBalance}("");
+        require(success, "Withdrawal failed");
+        emit Withdrawn(owner, contractBalance);
     }
 
     function balance() public view returns (uint) {
-        uint contractBalance = address(this).balance;
-        uint interest = calcInterest(contractBalance);
-        return contractBalance + interest;
+        return address(this).balance;
     }
 
     receive() external payable {
